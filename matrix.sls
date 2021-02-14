@@ -1,9 +1,11 @@
 (library (matrix)
-  (export make-array array-ref array-set array-dims array-num-dims
+  (export make-array array-ref array-set! array-dims array-num-dims
           array-num-vals array-rows array-cols matrix? array-copy
           array-flatten vec->array array-ref-row array-set-row!
           array-contract array-ref-col array-set-col! array-map
-          mul T array-fold-left)
+          mul T array-fold-left tr)
+  (import (rnrs))
+  
   (define (make-tensor dims init-val)
     (if (= (length dims) 1)
         (make-vector (car dims) init-val)
@@ -40,10 +42,10 @@
        (do ([sym start incr]) ((>= sym end) #f)
          (do-nested (i ...) e ...))]
       [(_ ((sym start end) i ...) e ...)
-       (do ([sym start (1+ sym)]) ((>= sym end) #f)
+       (do ([sym start (+ 1 sym)]) ((>= sym end) #f)
          (do-nested (i ...) e ...))]
       [(_ ((sym end) i ...) e ...)
-       (do ([sym 0 (1+ sym)]) ((>= sym end) #f)
+       (do ([sym 0 (+ 1 sym)]) ((>= sym end) #f)
          (do-nested (i ...) e ...))]))
 
   (define (make-array i j) (make-tensor (list i j) 0))
@@ -57,6 +59,7 @@
     (if (vector? (vector-ref a 0))
         (vector-length (vector-ref a 0))
         1))
+
   (define matrix?
     (lambda (x)
       (and (vector? x)
@@ -90,7 +93,7 @@
     (T (array-set-row! (T m) i v)))
 
   (define (array-contract m1 m2 i k)
-    (do ([j 0 (1+ j)]
+    (do ([j 0 (+ 1 j)]
          [accum 0 (+ accum (* (array-ref m1 i j)
                               (array-ref m2 j k)))])
         ((>= j (array-cols m1)) accum)))
@@ -112,6 +115,11 @@
         m)]
      [(number? a2)
       (array-map (lambda (x) (* a2 x)) a1)]))
+
+  (define (tr m)
+    (do ([i 0 (+ 1 i)]
+         [accum 0 (+ accum (array-ref m i i))])
+        ((>= i (min (array-cols m) (array-rows m))) accum)))
 
   (define (T a1)
     (let* ([m (make-array (array-cols a1) (array-rows a1))])
@@ -137,6 +145,9 @@
     (array-fold-left m max))
   (define (array-min m)
     (array-fold-left m min))
+
+  (define (frobebnius-norm)
+    (sqrt (tr (mul m (T m)))))
 
   ;; SVD
 

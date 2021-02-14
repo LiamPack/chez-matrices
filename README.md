@@ -20,6 +20,7 @@ optimized with the hope of going back later after benchmarking
 
 ### Implementation
 easier:
+* [ ] conjugate transpose (dagger)
 * [ ] SVD decomposition
 * [ ] solutions to linear equation
 * [ ] solutions to normal equations
