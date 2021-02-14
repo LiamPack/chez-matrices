@@ -23,7 +23,7 @@ optimized with the hope of going back later after benchmarking
 * [ ] use library or module? are these different in R6RS? i'm new here
 * [ ] Separate modules for matrix functionalities (base, exactly
       solving equations, approximately solving equations, operations
-      on matrices, etc.)
+      on matrices, linear approximations, etc.)
 
 ### Implementation
 easier:

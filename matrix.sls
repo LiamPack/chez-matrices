@@ -146,8 +146,12 @@
   (define (matrix-min m)
     (matrix-fold-left m min))
 
-  (define (frobebnius-norm)
-    (sqrt (tr (mul m (T m)))))
+  (define (frobenius-norm m)
+    (matrix-fold-left
+     (matrix-map (lambda (x) (expt x 2)) m)
+     +))
+  ;; (define (frobebnius-norm)
+  ;;   (sqrt (tr (mul m (T m)))))
 
   ;; SVD
 
