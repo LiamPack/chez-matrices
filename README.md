@@ -17,6 +17,13 @@ optimized with the hope of going back later after benchmarking
 * [ ] exceptions for mismatched dimensions or values
 * [ ] tests (need test library?)
 * [ ] benchmarking common operations (need benchmarking library?)
+* [ ] think harder about naming convention for more famous functions
+      (e.g the frobenius norm: should it be `frobenius-norm`?
+      `array-frobenius-norm`? kind of long-winded!)
+* [ ] use library or module? are these different in R6RS? i'm new here
+* [ ] Separate modules for matrix functionalities (base, exactly
+      solving equations, approximately solving equations, operations
+      on matrices, etc.)
 
 ### Implementation
 easier:
