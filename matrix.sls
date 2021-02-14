@@ -3,9 +3,10 @@
           matrix-num-vals matrix-rows matrix-cols matrix? matrix-copy
           matrix-flatten vec->matrix matrix-ref-row matrix-set-row!
           matrix-contract matrix-ref-col matrix-set-col! matrix-map
-          mul T matrix-fold-left tr)
+          mul T matrix-fold-left tr euclidean-norm cross-product
+          theta phi linsolve)
   (import (rnrs))
-  
+
   (define (make-tensor dims init-val)
     (if (= (length dims) 1)
         (make-vector (car dims) init-val)
@@ -68,10 +69,14 @@
 
   ;; assert proper dims
   (define (matrix-copy a)
-    (let* ([m (make-matrix (matrix-cols a) (matrix-rows a))])
+    (let* ([m (make-matrix (matrix-rows a) (matrix-cols a))])
       (do-nested ([i (matrix-rows a)] [j (matrix-cols a)])
                  (matrix-set! m i j (matrix-ref a i j)))
       m))
+
+  (define (matrix-copy! a b)
+    (do-nested ([i (matrix-rows a)] [j (matrix-cols a)])
+               (matrix-set! a i j (matrix-ref b i j))))
 
   (define (vec->matrix v)
     (make-matrix (vector-length v) 1))
@@ -150,10 +155,108 @@
     (matrix-fold-left
      (matrix-map (lambda (x) (expt x 2)) m)
      +))
+
+  (define (euclidean-norm M)
+    (cond
+     [(matrix? M) (frobenius-norm)]
+     [(vector? M)
+      (do ([i 0 (+ 1 i)]
+           [accum 0 (+ accum (expt (vector-ref M i) 2))])
+          ((>= i (vector-length M)) (sqrt accum)))]))
+
   ;; (define (frobebnius-norm)
   ;;   (sqrt (tr (mul m (T m)))))
 
   ;; SVD
 
   ;; Solve linear equation
+  (define (linsolve input-A input-B)
+    (when (and (matrix? input-A) (matrix? input-B))
+      (let* ([A (matrix-copy input-A)]
+             [B (matrix-copy input-B)]
+             [nrows (matrix-rows A)]
+             [ncols (matrix-cols A)])
+        (letrec* ([leading
+                   (lambda (col-idx)
+                     (do ([i col-idx (+ 1 i)]
+                          [ret #f])
+                         ((or (>= col-idx nrows) (>= i ncols)) ret)
+                       (when (not (zero? (matrix-ref A i col-idx)))
+                         (set! ret i)
+                         (set! i ncols))))]
+                  [normalize-row
+                   (lambda (row col)
+                     (let ([norm-val (matrix-ref A row col)])
+                       (matrix-set-row! A row
+                                        (vector-map (lambda (x) (/ x norm-val))
+                                                    (matrix-ref-row A row)))
+                       (matrix-set! B row 0
+                                    (/ (matrix-ref B row 0) norm-val))))]
+                  [swap-rows
+                   (lambda (row-idx1 row-idx2)
+                     (unless (= row-idx1 row-idx2)
+                       (do ([i 0 (+ 1 i)])
+                           ((>= i ncols) #f)
+                         (let ([tmp (matrix-ref A row-idx1 i)])
+                           (matrix-set! A row-idx1 i (matrix-ref A row-idx2 i))
+                           (matrix-set! A row-idx2 i tmp)))
+                       (let ([tmp (matrix-ref B row-idx1 0)])
+                         (matrix-set! B row-idx1 0 (matrix-ref B row-idx2 0))
+                         (matrix-set! B row-idx2 0 tmp))))]
+                  [eliminate-row
+                   (lambda (row-idx col-idx basis-idx)
+                     (let ([ratio (matrix-ref A row-idx col-idx)])
+                       (do ([i col-idx (+ 1 i)])
+                           ((>= i ncols))
+                         (matrix-set! A row-idx i
+                                      (- (matrix-ref A row-idx i)
+                                         (* ratio (matrix-ref A basis-idx i)))))
+                       (matrix-set! B row-idx 0
+                                    (- (matrix-ref B row-idx 0)
+                                       (* ratio (matrix-ref B basis-idx 0))))))])
+
+          (do ([j 0 (+ 1 j)])
+              ((>= j ncols))
+            (let ([lead (leading j)])
+              (if (not lead)
+                  (set! j (+ 1 ncols)) ;;if i knew how to use
+                  ;;call/cc it would happen
+                  ;;here
+                  (begin
+                    (normalize-row lead j)
+                    (do ([i 0 (+ 1 i)])
+                        ((>= i nrows))
+                      (unless (= i lead)
+                        (eliminate-row i j lead)))
+                    (swap-rows j lead)
+                    ))))
+          B))))
+
+  ;; 3D vector operations
+
+  ;; Assert vector-length(v) = 3
+
+  ;; Using the physics notation of the azimuthal 2\pi angle being phi
+  (define (phi v)
+    (atan (vector-ref v 1)
+          (vector-ref v 0)))
+
+  (define (theta v)
+    (acos (/ (vector-ref v 2)
+             (euclidean-norm v))))
+
+  ;; assert dim 3
+  (define (cross-product v w)
+    (let ([cross-vw (make-vector 3)])
+      (apply
+       (lambda (ax ay az bx by bz)
+         (vector-set! cross-vw 0 (- (* ay bz)
+                                    (* by az)))
+         (vector-set! cross-vw 1 (- (- (* ax bz)
+                                       (* bx az))))
+         (vector-set! cross-vw 2 (- (* ax by)
+                                    (* bx ay))))
+       (append (vector->list v) (vector->list w)))
+      cross-vw))
+
   )

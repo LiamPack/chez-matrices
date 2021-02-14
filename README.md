@@ -29,7 +29,7 @@ optimized with the hope of going back later after benchmarking
 easier:
 * [ ] conjugate transpose (dagger)
 * [ ] SVD decomposition
-* [ ] solutions to linear equation
+* [x] solutions to linear equation
 * [ ] solutions to normal equations
 * [ ] regression with regularizers
 * [ ] read matrix from CSV
