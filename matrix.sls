@@ -2,9 +2,10 @@
   (export make-matrix matrix-ref matrix-set! matrix-dims matrix-num-dims
           matrix-num-vals matrix-rows matrix-cols matrix? matrix-copy
           matrix-flatten vec->matrix matrix-ref-row matrix-set-row!
-          matrix-contract matrix-ref-col matrix-set-col! matrix-map
-          mul T matrix-fold-left tr euclidean-norm cross-product
-          theta phi linsolve)
+          matrix-set-diagonal! matrix-identity
+          matrix-max matrix-min matrix-contract matrix-ref-col matrix-set-col!
+          matrix-map mul T matrix-fold-left tr euclidean-norm cross-product
+          theta phi linsolve matrix-inverse matrix=)
   (import (rnrs))
 
   (define (make-tensor dims init-val)
@@ -97,6 +98,18 @@
   (define (matrix-set-col! m i v)
     (T (matrix-set-row! (T m) i v)))
 
+  ;; assert len(v) = min(dimensions(m))
+  (define (matrix-set-diagonal! m v)
+    (let ([new-m (matrix-copy m)])
+      (do ([i 0 (+ 1 i)])
+          ((>= i (vector-length v)) m)
+        (matrix-set! m i i (vector-ref v i)))))
+
+  (define (matrix-identity dim)
+    (let ([m (make-matrix dim dim)])
+      (matrix-set-diagonal! m (make-vector dim 1))
+      m))
+
   (define (matrix-contract m1 m2 i k)
     (do ([j 0 (+ 1 j)]
          [accum 0 (+ accum (* (matrix-ref m1 i j)
@@ -141,24 +154,33 @@
   (define (vector-fold-left f)
     (lambda (v)
       (fold-left f (vector-ref v 0) (vector->list v))))
-  (define (matrix-fold-left m f)
+  (define (matrix-fold-left f m)
     (fold-left f (matrix-ref m 0 0)
                (vector->list (vector-map (vector-fold-left f) m))))
 
+  ;; not good enough at macros to have matrix-map take variable args
+  (define (matrix= A B)
+    (matrix-fold-left
+     (lambda (x y) (and x y))
+     (vector-map
+      (lambda (a b)
+        (vector-map = a b))
+      A B)))
+
   ;; Norms
   (define (matrix-max m)
-    (matrix-fold-left m max))
+    (matrix-fold-left max m))
   (define (matrix-min m)
-    (matrix-fold-left m min))
+    (matrix-fold-left min m))
 
   (define (frobenius-norm m)
     (matrix-fold-left
-     (matrix-map (lambda (x) (expt x 2)) m)
-     +))
+     +
+     (matrix-map (lambda (x) (expt x 2)) m)))
 
   (define (euclidean-norm M)
     (cond
-     [(matrix? M) (frobenius-norm)]
+     [(matrix? M) (frobenius-norm M)]
      [(vector? M)
       (do ([i 0 (+ 1 i)]
            [accum 0 (+ accum (expt (vector-ref M i) 2))])
@@ -176,65 +198,113 @@
              [B (matrix-copy input-B)]
              [nrows (matrix-rows A)]
              [ncols (matrix-cols A)])
-        (letrec* ([leading
-                   (lambda (col-idx)
-                     (do ([i col-idx (+ 1 i)]
-                          [ret #f])
-                         ((or (>= col-idx nrows) (>= i ncols)) ret)
-                       (when (not (zero? (matrix-ref A i col-idx)))
-                         (set! ret i)
-                         (set! i ncols))))]
-                  [normalize-row
-                   (lambda (row col)
-                     (let ([norm-val (matrix-ref A row col)])
-                       (matrix-set-row! A row
-                                        (vector-map (lambda (x) (/ x norm-val))
-                                                    (matrix-ref-row A row)))
-                       (matrix-set! B row 0
-                                    (/ (matrix-ref B row 0) norm-val))))]
-                  [swap-rows
-                   (lambda (row-idx1 row-idx2)
-                     (unless (= row-idx1 row-idx2)
-                       (do ([i 0 (+ 1 i)])
-                           ((>= i ncols) #f)
-                         (let ([tmp (matrix-ref A row-idx1 i)])
-                           (matrix-set! A row-idx1 i (matrix-ref A row-idx2 i))
-                           (matrix-set! A row-idx2 i tmp)))
-                       (let ([tmp (matrix-ref B row-idx1 0)])
-                         (matrix-set! B row-idx1 0 (matrix-ref B row-idx2 0))
-                         (matrix-set! B row-idx2 0 tmp))))]
-                  [eliminate-row
-                   (lambda (row-idx col-idx basis-idx)
-                     (let ([ratio (matrix-ref A row-idx col-idx)])
-                       (do ([i col-idx (+ 1 i)])
-                           ((>= i ncols))
-                         (matrix-set! A row-idx i
-                                      (- (matrix-ref A row-idx i)
-                                         (* ratio (matrix-ref A basis-idx i)))))
-                       (matrix-set! B row-idx 0
-                                    (- (matrix-ref B row-idx 0)
-                                       (* ratio (matrix-ref B basis-idx 0))))))])
+        (let ([leading
+               (lambda (col-idx)
+                 (call/cc (lambda (break)
+                            (do ([i col-idx (+ 1 i)])
+                                ((or (>= col-idx nrows) (>= i ncols)) #f)
+                              (when (not (zero? (matrix-ref A i col-idx)))
+                                (break i))))))]
+              [normalize-row
+               (lambda (row col)
+                 (let ([norm-val (matrix-ref A row col)])
+                   (matrix-set-row! A row
+                                    (vector-map (lambda (x) (/ x norm-val))
+                                                (matrix-ref-row A row)))
+                   (matrix-set! B row 0
+                                (/ (matrix-ref B row 0) norm-val))))]
+              [swap-rows
+               (lambda (row-idx1 row-idx2)
+                 (unless (= row-idx1 row-idx2)
+                   (let ([tmp-row (matrix-ref-row A row-idx1)]
+                         [tmp-b (matrix-ref B row-idx1 0)])
+                     (matrix-set-row! A row-idx1 (matrix-ref-row A row-idx2))
+                     (matrix-set-row! A row-idx2 tmp-row)
+                     (matrix-set! B row-idx1 0 (matrix-ref B row-idx2 0))
+                     (matrix-set! B row-idx2 0 tmp-b))))]
+              [eliminate-row
+               (lambda (row-idx col-idx basis-idx)
+                 (let ([ratio (matrix-ref A row-idx col-idx)])
+                   (do ([i col-idx (+ 1 i)])
+                       ((>= i ncols))
+                     (matrix-set! A row-idx i
+                                  (- (matrix-ref A row-idx i)
+                                     (* ratio (matrix-ref A basis-idx i)))))
+                   (matrix-set! B row-idx 0
+                                (- (matrix-ref B row-idx 0)
+                                   (* ratio (matrix-ref B basis-idx 0))))))])
+          (call/cc
+           (lambda (break)
+             (do ([j 0 (+ 1 j)])
+                 ((>= j ncols) B)
+               (let ([lead (leading j)])
+                 (when (not lead)
+                   (break #f))
+                 (normalize-row lead j)
+                 (do ([i 0 (+ 1 i)])
+                     ((>= i nrows))
+                   (unless (= i lead)
+                     (eliminate-row i j lead)))
+                 (swap-rows j lead)))))))))
 
-          (do ([j 0 (+ 1 j)])
-              ((>= j ncols))
-            (let ([lead (leading j)])
-              (if (not lead)
-                  (set! j (+ 1 ncols)) ;;if i knew how to use
-                  ;;call/cc it would happen
-                  ;;here
-                  (begin
-                    (normalize-row lead j)
-                    (do ([i 0 (+ 1 i)])
-                        ((>= i nrows))
-                      (unless (= i lead)
-                        (eliminate-row i j lead)))
-                    (swap-rows j lead)
-                    ))))
-          B))))
+  (define (matrix-inverse input-A)
+    (when (and (= (matrix-cols input-A) (matrix-rows input-A)) (matrix? input-A))
+      (let* ([A (matrix-copy input-A)]
+             [nrows (matrix-rows A)]
+             [ncols (matrix-cols A)]
+             [inv-A (matrix-identity nrows)])
+        (let ([leading
+               (lambda (col-idx)
+                 (call/cc
+                  (lambda (break)
+                    (do ([i col-idx (+ 1 i)])
+                        ((or (>= col-idx nrows) (>= i ncols)) #f)
+                      (when (not (zero? (matrix-ref A i col-idx)))
+                        (break i))))))]
+              [normalize-row
+               (lambda (row col)
+                 (let ([norm-val (matrix-ref A row col)])
+                   (matrix-set-row! A row
+                                    (vector-map (lambda (x) (/ x norm-val))
+                                                (matrix-ref-row A row)))
+                   (matrix-set-row! inv-A row
+                                    (vector-map (lambda (x) (/ x norm-val))
+                                                (matrix-ref-row inv-A row)))))]
+              [swap-rows
+               (lambda (row-idx1 row-idx2)
+                 (unless (= row-idx1 row-idx2)
+                   (let ([tmp-row (matrix-ref-row A row-idx1)]
+                         [tmp-row-inv (matrix-ref-row inv-A row-idx1)])
+                     (matrix-set-row! A row-idx1 (matrix-ref-row A row-idx2))
+                     (matrix-set-row! A row-idx2 tmp-row)
+                     (matrix-set-row! inv-A row-idx1 (matrix-ref-row inv-A row-idx2))
+                     (matrix-set-row! inv-A row-idx2 tmp-row-inv))))]
+              [eliminate-row
+               (lambda (row-idx col-idx basis-idx)
+                 (let ([ratio (matrix-ref A row-idx col-idx)])
+                   (do ([i 0 (+ 1 i)])
+                       ((>= i ncols))
+                     (matrix-set! A row-idx i
+                                  (- (matrix-ref A row-idx i)
+                                     (* ratio (matrix-ref A basis-idx i))))
+                     (matrix-set! inv-A row-idx i
+                                  (- (matrix-ref inv-A row-idx i)
+                                     (* ratio (matrix-ref inv-A basis-idx i)))))))])
 
-  ;; 3D vector operations
-
-  ;; Assert vector-length(v) = 3
+          (call/cc
+           (lambda (break)
+             (do ([j 0 (+ 1 j)])
+                 ((>= j ncols) inv-A)
+               (let ([lead (leading j)])
+                 (when (not lead)
+                   (break #f))
+                 (normalize-row lead j)
+                 (do ([i 0 (+ 1 i)])
+                     ((>= i nrows))
+                   (unless (= i lead)
+                     (eliminate-row i j lead)))
+                 (swap-rows j lead)))
+             ))))))
 
   ;; Using the physics notation of the azimuthal 2\pi angle being phi
   (define (phi v)

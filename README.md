@@ -28,10 +28,12 @@ optimized with the hope of going back later after benchmarking
 ### Implementation
 easier:
 * [ ] conjugate transpose (dagger)
+* [ ] determinant
+* [x] inverse
+  * could do this quick or just use the gauss-jordan reduction for
+    left inverse if it exists
 * [ ] SVD decomposition
 * [x] solutions to linear equation
-* [ ] solutions to normal equations
-* [ ] regression with regularizers
 * [ ] read matrix from CSV
 * [ ] fixed value types? no clue how this goes in scheme
 
