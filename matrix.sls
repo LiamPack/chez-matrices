@@ -84,8 +84,8 @@
                  (vector-set! v (+ j (* i (matrix-cols m)))
                               (matrix-ref m i j)))))
 
-  (define (matrix-ref-row m i) (vector-ref m i))
-  (define (matrix-set-row! m i v) (vector-set! m i v))
+  (define (matrix-ref-row m i) (matrix-ref m i))
+  (define (matrix-set-row! m i v) (matrix-set! m i v))
 
   ;; verry inefficient but clean!
   (define (matrix-ref-col m i)
