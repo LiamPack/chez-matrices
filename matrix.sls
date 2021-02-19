@@ -1,65 +1,64 @@
-(library (matrix)
-  (export make-matrix matrix-ref matrix-set! matrix-dims matrix-num-dims
+(library (matrix) (export make-matrix matrix-ref matrix-set! matrix-dims matrix-num-dims
           matrix-num-vals matrix-rows matrix-cols matrix? matrix-copy
           matrix-flatten vec->matrix matrix-ref-row matrix-set-row!
           matrix-set-diagonal! matrix-identity
           matrix-max matrix-min matrix-contract matrix-ref-col matrix-set-col!
           matrix-map mul T matrix-fold-left tr euclidean-norm cross-product
-          theta phi linsolve matrix-inverse matrix=)
+          theta phi linsolve matrix-inverse matrix= make-matrix do-matrix matrix-fold)
   (import (rnrs))
 
-  (define (make-tensor dims init-val)
-    (if (= (length dims) 1)
-        (make-vector (car dims) init-val)
-        (let ([rows (car dims)]
-              [cols (cadr dims)])
-          (do ([m (make-vector rows)]
-               [i 0 (+ i 1)])
-              ((= i rows) m)
-            (vector-set! m i (make-tensor (cdr dims) init-val))))))
-
-  (define (tensor-ref tensor indices)
-    (let tensor-ref-rec ([tensor tensor] [indices (reverse indices)])
-      (if (= (length indices) 1)
-          (vector-ref tensor (car indices))
-          (vector-ref (tensor-ref-rec tensor (cdr indices)) (car indices)))))
-
-  (define (tensor-set! tensor indices val)
-    (let ([base-vec (tensor-ref tensor (reverse (cdr (reverse indices))))])
-      (vector-set! base-vec (car (reverse indices)) val)))
-
-  (define (tensor-dims tensor)
+  (define (matrix-dims tensor)
     (let tensor-dims-rec ([tensor tensor] [dim-list (list)])
       (if (number? (vector-ref tensor 0))
           (reverse (cons (vector-length tensor) dim-list))
           (tensor-dims-rec (vector-ref tensor 0) (cons (vector-length tensor) dim-list)))))
 
-  (define (tensor-rank tensor)
-    (length (tensor-dims tensor)))
+  (define (matrix-num-dims tensor)
+    (length (matrix-dims tensor)))
 
-  (define-syntax do-nested
+  (define-syntax do-matrix
     (syntax-rules ()
-      [(_ () e ...)  (begin e ...)]
-      [(_ ((sym start end incr) i ...) e ...)
-       (do ([sym start incr]) ((>= sym end) #f)
-         (do-nested (i ...) e ...))]
-      [(_ ((sym start end) i ...) e ...)
-       (do ([sym start (+ 1 sym)]) ((>= sym end) #f)
-         (do-nested (i ...) e ...))]
-      [(_ ((sym end) i ...) e ...)
-       (do ([sym 0 (+ 1 sym)]) ((>= sym end) #f)
-         (do-nested (i ...) e ...))]))
+      [(_ m () rest ...) (begin rest ...)]
+      [(_ m (() j ...) rest ...)
+       (do ([i 0 (+ 1 i)])
+           ((>= i 1))
+         (do-matrix (matrix-ref m 0) (j ...) rest ...))]
+      [(_ m (i j ...) rest ...)
+       (do ([i 0 (+ 1 i)])
+           ((>= i (car (matrix-dims m))))
+         (do-matrix (matrix-ref m 0) (j ...) rest ...))]
+      [(_ m ret (i j ...) rest ...)
+       (do ([i 0 (+ 1 i)])
+           ((>= i (car (matrix-dims m))) ret)
+         (do-matrix (matrix-ref m 0) (j ...) rest ...))]))
 
-  (define (make-matrix i j) (make-tensor (list i j) 0))
-  (define (matrix-ref m i j) (tensor-ref m (list i j)))
-  (define (matrix-set! m i j val) (tensor-set! m (list i j) val))
-  (define matrix-dims tensor-dims)
-  (define matrix-num-dims tensor-rank)
+  (define-syntax make-matrix
+    (syntax-rules ()
+      [(_ i) (make-vector i)]
+      [(_ i j)
+       (do ([m (make-vector i)]
+            [k 0 (+ k 1)])
+           ((= k i) m)
+         (vector-set! m k (make-vector j)))]
+      [(_ i j k ...)
+       (make-vector i (make-matrix j k ...))]))
+
+  (define-syntax matrix-ref
+    (syntax-rules ()
+      [(_ m i) (vector-ref m i)]
+      [(_ m i j k ...) (vector-ref (matrix-ref m i k ...) j)]))
+
+  (define-syntax matrix-set!
+    (syntax-rules ()
+      [(_ m i val) (vector-set! m i val)]
+      [(_ m i j k ... val) (matrix-set! (vector-ref m i) j k ... val)]))
+
+
   (define (matrix-num-vals m) (map * (matrix-dims m)))
   (define (matrix-rows a) (vector-length a))
   (define (matrix-cols a)
-    (if (vector? (vector-ref a 0))
-        (vector-length (vector-ref a 0))
+    (if (vector? (matrix-ref a 0))
+        (vector-length (matrix-ref a 0))
         1))
 
   (define matrix?
@@ -71,23 +70,19 @@
   ;; assert proper dims
   (define (matrix-copy a)
     (let* ([m (make-matrix (matrix-rows a) (matrix-cols a))])
-      (do-nested ([i (matrix-rows a)] [j (matrix-cols a)])
-                 (matrix-set! m i j (matrix-ref a i j)))
-      m))
+      (do-matrix m m (i j) (matrix-set! m i j (matrix-ref a i j)))))
 
   (define (matrix-copy! a b)
-    (do-nested ([i (matrix-rows a)] [j (matrix-cols a)])
-               (matrix-set! a i j (matrix-ref b i j))))
+    (do-matrix a (i j) (matrix-set! a i j (matrix-ref b i j))))
 
   (define (vec->matrix v)
     (make-matrix (vector-length v) 1))
 
   (define (matrix-flatten m)
     (let* ([v (make-vector (* (matrix-cols m) (matrix-rows m)))])
-      (do-nested ([i (matrix-rows m)] [j (matrix-cols m)])
-                 (vector-set! v (+ j (* i matrix-cols))
-                              (matrix-ref m i j)))
-      v))
+      (do-matrix m v (i j)
+                 (vector-set! v (+ j (* i (matrix-cols m)))
+                              (matrix-ref m i j)))))
 
   (define (matrix-ref-row m i) (vector-ref m i))
   (define (matrix-set-row! m i v) (vector-set! m i v))
@@ -96,7 +91,7 @@
   (define (matrix-ref-col m i)
     (matrix-ref-row (T m) i))
   (define (matrix-set-col! m i v)
-    (T (matrix-set-row! (T m) i v)))
+    (do-matrix m (row ()) (matrix-set! m row i (vector-ref v row))))
 
   ;; assert len(v) = min(dimensions(m))
   (define (matrix-set-diagonal! m v)
@@ -126,12 +121,12 @@
   ;; case on a1/a2 being a constant or not
   (define (mul a1 a2)
     (cond
-     [(matrix? a2)
+     [(and (matrix? a1) (matrix? a2))
       (let* ([m (make-matrix (matrix-rows a1) (matrix-cols a2))])
-        (do-nested ([i (matrix-rows a1)] [k (matrix-cols a2)])
-                   (matrix-set! m i k (matrix-contract a1 a2 i k)))
-        m)]
-     [(number? a2)
+        (do-matrix m m (i k) (matrix-set! m i k (matrix-contract a1 a2 i k))))]
+     [(and (matrix? a2) (number? a1))
+      (matrix-map (lambda (x) (* a1 x)) a2)]
+     [(and (matrix? a1) (number? a2))
       (matrix-map (lambda (x) (* a2 x)) a1)]))
 
   (define (tr m)
@@ -140,14 +135,13 @@
         ((>= i (min (matrix-cols m) (matrix-rows m))) accum)))
 
   (define (T a1)
-    (let* ([m (make-matrix (matrix-cols a1) (matrix-rows a1))])
-      (do-nested ([i 0 (matrix-rows a1)] [j 0 (matrix-cols a1)])
-                 (matrix-set! m j i (matrix-ref a1 i j)))
-      m))
+    (let ([m (make-matrix (matrix-cols a1) (matrix-rows a1))])
+      (do-matrix m m (i j)
+                 (matrix-set! m j i (matrix-ref a1 i j)))))
 
   ;; assert len(v) = len(w) and both vectors and all that
   (define (dot v w)
-    (matrix-ref (mul (T v) w)))
+    (matrix-ref (mul (T v) w) 0))
 
   ;; vector->list probably inefficient, don't know how that's
   ;; implemented its probably O(n)
@@ -155,8 +149,13 @@
     (lambda (v)
       (fold-left f (vector-ref v 0) (vector->list v))))
   (define (matrix-fold-left f m)
+
     (fold-left f (matrix-ref m 0 0)
                (vector->list (vector-map (vector-fold-left f) m))))
+
+  (define (matrix-fold f m)
+    (let ([ret (matrix-ref m 0 0)])
+      (do-matrix m ret (i j) (set! ret (f ret (matrix-ref m i j))))))
 
   ;; not good enough at macros to have matrix-map take variable args
   (define (matrix= A B)
@@ -180,16 +179,13 @@
 
   (define (euclidean-norm M)
     (cond
-     [(matrix? M) (frobenius-norm M)]
+     [(matrix? M)
+      (let ([ret 0])
+        (matrix-map (lambda (x) (set! ret (+ ret (expt x 2)))) M))]
      [(vector? M)
       (do ([i 0 (+ 1 i)]
            [accum 0 (+ accum (expt (vector-ref M i) 2))])
           ((>= i (vector-length M)) (sqrt accum)))]))
-
-  ;; (define (frobebnius-norm)
-  ;;   (sqrt (tr (mul m (T m)))))
-
-  ;; SVD
 
   ;; Solve linear equation
   (define (linsolve input-A input-B)
@@ -290,7 +286,6 @@
                      (matrix-set! inv-A row-idx i
                                   (- (matrix-ref inv-A row-idx i)
                                      (* ratio (matrix-ref inv-A basis-idx i)))))))])
-
           (call/cc
            (lambda (break)
              (do ([j 0 (+ 1 j)])
@@ -328,5 +323,4 @@
                                     (* bx ay))))
        (append (vector->list v) (vector->list w)))
       cross-vw))
-
   )

@@ -33,6 +33,7 @@ easier:
   * could do this quick or just use the gauss-jordan reduction for
     left inverse if it exists
 * [ ] SVD decomposition
+* [ ] generate matrix with values given by a lambda
 * [x] solutions to linear equation
 * [ ] read matrix from CSV
 * [ ] fixed value types? no clue how this goes in scheme
