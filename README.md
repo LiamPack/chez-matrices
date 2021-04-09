@@ -47,10 +47,12 @@ on matrices, linear approximations, etc.)
 
 ### Implementation
 macro transition:
-* [ ] matrix map (this would be do-matrix over all indices)
-* [ ] matrix fold
-* [ ] matrix?
-* [ ] syntax for expanding ranges in matrix-ref (i 10 20) or something
+* [-] matrix map (this would be do-matrix over all indices)
+  * 2D case OK
+* [-] matrix fold
+  * 2D case OK
+* [x] matrix?
+* [x] syntax for expanding ranges in matrix-ref (i 10 20) or something
 
 easier:
 * [ ] matrix-cols to handle single-vector as a row vector (length of
