@@ -56,6 +56,6 @@
   ;;   (det) (* 4 3 3 5))
 
   )
-(test-end)
+(test-end "simple matrix operations")
 
-;; (exit (if (zero? (test-runner-fail-count (test-runner-get))) 0 1))
+(exit (if (zero? (test-runner-fail-count (test-runner-get))) 0 1))
