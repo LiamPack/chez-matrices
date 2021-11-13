@@ -10,12 +10,17 @@ uniform size across each axis. Because of this, these may be useful in
 constructing a data-frame-esque record type with the underlying
 operations being `any`-typed 2x2 matrix operations.
 
+Related SRFIs:
+- [SRFI 63 for array types](https://srfi.schemers.org/srfi-63/srfi-63.html)
+- [SRFI 164 for multidimensional array
+utilities](https://srfi.schemers.org/srfi-164/srfi-164.html))
+
 ## Disclaimer
 1. Currently very barebones! The structure isn't great!
 2. I've never used scheme before so this will be potentially
 not-very-scheme-like.
 3. I don't know the quirks on scheme function implementations and
-their computational complexity. In light of this, I've tried to 
+their computational complexity. In light of this, I've tried to
 implement slightly-better-than-naiive solutions rather than highly
 optimized with the hope of going back later after benchmarking
 
@@ -31,6 +36,12 @@ obtaining the length along each axis of `A`). This also has the downside of
 obscuring the structure of a matrix from the user: a lambda could be anything!
 I'm not adept enough with scheme (alt: don't know enough about existing SRFIs),
 so things might look primitive.
+
+UPDATE [2021-11-13]: speaking of not knowing the SRFIs, I now know there have
+been lots of efforts in introducing efficient array types into scheme ([SRFI 63
+for array types](https://srfi.schemers.org/srfi-63/srfi-63.html), [SRFI 164 for
+multidimensional array
+utilities](https://srfi.schemers.org/srfi-164/srfi-164.html)).
 
 # Running
 If you have [akku](https://akkuscm.org/), life is easy:
@@ -51,16 +62,16 @@ operations are implemented (although probably not very efficiently).
 
 Complete implementations:
 - Common matrix operations (`make-matrix, matrix-ref, matrix-set!, matrix-rows,
-  matrix-cols, matrix-copy, matrix?, matrix-ref-row ...`)
+matrix-cols, matrix-copy, matrix?, matrix-ref-row ...`)
 - Common matrix operations (`matrix-min, matrix-max, mul, T
-  (transpose), tr (trace), euclidean-norm ...`)
+(transpose), tr (trace), euclidean-norm ...`)
 - Functions/macros to iterate over a matrix (`do-matrix, matrix-fold, matrix-map,
-  matrix-contract (only 1D contractions)`).
-  - `do-matrix` is a notable macro to iterate over a matrix. It allows syntax of
-    the form:
+matrix-contract (only 1D contractions)`).
+- `do-matrix` is a notable macro to iterate over a matrix. It allows syntax of
+the form:
     ```scheme
     (do-matrix m (i j () l) ...)
     ```
     Where `m` is the matrix to iterate over, `i, j, _, l` are indices to loop
     over. Indices can be skipped with an empty list `()` and the iteration goes
-    over the entire length of an axis. 
+    over the entire length of an axis.
