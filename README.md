@@ -11,67 +11,51 @@ constructing a data-frame-esque record type with the underlying
 operations being `any`-typed 2x2 matrix operations.
 
 ## Disclaimer
-1. Currently very barebones! And not really structured well!
+1. Currently very barebones! The structure isn't great!
 2. I've never used scheme before so this will be potentially
-not-very-scheme-y.
+not-very-scheme-like.
 3. I don't know the quirks on scheme function implementations and
-their computational complexity. In light of this, I've tried to do
+their computational complexity. In light of this, I've tried to 
 implement slightly-better-than-naiive solutions rather than highly
 optimized with the hope of going back later after benchmarking
 
 # Lamentations
 I think the scheme vector function interface `vector-*` is clunky for
-matrices. What I would *like* to do is implement matrices and tensors
-as functions acting on four numbers, their indices. This is consistent
-with the mathematical definition of index-based structures as simply
-being a map `f: Natural Number -> Value` so that `f_i defined as
-f(i)`. This also gives a much more natural syntax for array
-references, `(A i j)`. Unfortunately, this would result in extensive
-computation for even very simple operations (such as obtaining the
-length along each axis of `A`). If you know of a way to obtain this
-kind of interface while still keeping the benefits of fixed-size
-vectors, please lord let me know I'm fiending for it.
+matrices. What I would *like* to do is implement matrices and tensors as
+functions acting on, e.g., four numbers: their indices. This is consistent with
+the mathematical definition of index-based structures as simply being a map `f:
+Natural Number -> Value` so that `f_i := f(i)`. This also gives a much
+more natural syntax for array references, `(A i j)`. Unfortunately, this would
+result in extensive computation for even very simple operations (such as
+obtaining the length along each axis of `A`). This also has the downside of
+obscuring the structure of a matrix from the user: a lambda could be anything!
+I'm not adept enough with scheme (alt: don't know enough SRFI 
 
-# TODOs that should be in the "Issues" tab
-### Structural
-* [ ] exceptions for mismatched dimensions or values
-* [ ] tests (need test library?)
-* [ ] benchmarking common operations (need benchmarking library?)
-* [ ] think harder about naming convention for more famous functions
-(e.g the frobenius norm: should it be `frobenius-norm`?
-`array-frobenius-norm`? kind of long-winded!)
-* [ ] use library or module? are these different in R6RS? i'm new here
-* [ ] Separate modules for matrix functionalities (base, exactly
-solving equations, approximately solving equations, operations
-on matrices, linear approximations, etc.)
+# Running
+If you have [akku](https://akkuscm.org/), life is easy:
 
-### Implementation
-macro transition:
-* [-] matrix map (this would be do-matrix over all indices)
-  * 2D case OK
-* [-] matrix fold
-  * 2D case OK
-* [x] matrix?
-* [x] syntax for expanding ranges in matrix-ref (i 10 20) or something
+```bash
+akku install
+.akku/env
+./tests/test-chez-matrices.sps
+```
 
-easier:
-* [ ] matrix-cols to handle single-vector as a row vector (length of
-vector = cols)
-* [ ] conjugate transpose (dagger)
-* [ ] determinant
-* [x] inverse
-* could do this quick or just use the gauss-jordan reduction for
-left inverse if it exists
-* [ ] SVD decomposition
-* [ ] generate matrix with values given by a lambda
-* [x] solutions to linear equation
-* [ ] read matrix from CSV
-* [ ] matrix/tensor contractions (contract (i j k) (M i j) (D j k)) or something
+# Outstanding issues
+Check out the issues tab to see what isn't here yet. Most of the usual matrix
+operations are implemented (although probably not very efficiently).
 
-
-harder:
-* [ ] Generalize to higher dimensions (a la numpy arrays)
-* [ ] slices
-* [ ] broadcasting to slices
-* [ ] fixed value types? no clue how this goes in scheme. Currently
-the data type is "anything goes". probably need byte vectors.
+Complete implementations:
+- Common matrix operations (`make-matrix, matrix-ref, matrix-set!, matrix-rows,
+  matrix-cols, matrix-copy, matrix?, matrix-ref-row ...`)
+- Common matrix operations (`matrix-min, matrix-max, mul, T
+  (transpose), tr (trace), euclidean-norm ...`)
+- Functions/macros to iterate over a matrix (`do-matrix, matrix-fold, matrix-map,
+  matrix-contract (only 1D contractions)`).
+  - `do-matrix` is a notable macro to iterate over a matrix. It allows syntax of
+    the form:
+    ```scheme
+    (do-matrix m (i j () l) ...)
+    ```
+    Where `m` is the matrix to iterate over, `i, j, _, l` are indices to loop
+    over. Indices can be skipped with an empty list `()` and the iteration goes
+    over the entire length of an axis. 
