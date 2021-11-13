@@ -40,6 +40,10 @@ akku install
 ./tests/test-chez-matrices.sps
 ```
 
+This repo only depends on [ SRFI 64
+](https://srfi.schemers.org/srfi-64/srfi-64.html) for the test suite. A life
+without a testing library is a sad one after-all.
+
 # Outstanding issues
 Check out the issues tab to see what isn't here yet. Most of the usual matrix
 operations are implemented (although probably not very efficiently).
