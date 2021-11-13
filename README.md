@@ -29,7 +29,8 @@ more natural syntax for array references, `(A i j)`. Unfortunately, this would
 result in extensive computation for even very simple operations (such as
 obtaining the length along each axis of `A`). This also has the downside of
 obscuring the structure of a matrix from the user: a lambda could be anything!
-I'm not adept enough with scheme (alt: don't know enough SRFI 
+I'm not adept enough with scheme (alt: don't know enough about existing SRFIs),
+so things might look primitive.
 
 # Running
 If you have [akku](https://akkuscm.org/), life is easy:
