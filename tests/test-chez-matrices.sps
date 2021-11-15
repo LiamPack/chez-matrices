@@ -52,6 +52,12 @@
   (test-equal "tr"
     (tr m) (+ 4 3 3 5))
 
+  (test-equal "matrix map"
+    (matrix-map (lambda (x) (* 2 x)) '#(#(#(4 3 4) #(1 1 1)))) '#(#(#(8 6 8) #(2 2 2))) )
+
+  (test-equal "matrix fold left"
+    (matrix-fold (lambda (x y) (+ y x)) 0 '#(#(#(4 3 4) #(1 1 1)))) (+ 4 3 4 1 1 1))
+
   ;; (test-equal "det"
   ;;   (det) (* 4 3 3 5))
 

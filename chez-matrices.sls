@@ -9,13 +9,14 @@
           matrix-flatten vec->matrix matrix-ref-row matrix-set-row!
           matrix-set-diagonal! matrix-identity
           matrix-max matrix-min matrix-contract matrix-ref-col matrix-set-col!
-          matrix-map mul T matrix-fold-left tr euclidean-norm cross-product
+          matrix-map matrix-map2 mul T matrix-fold tr euclidean-norm cross-product
           theta phi linsolve matrix-inverse matrix= make-matrix do-matrix matrix-fold)
-  (import (rnrs))
+  (import (rnrs (6))
+          (only (srfi :133 vectors) vector-fold))
 
   (define (matrix-dims tensor)
     (let tensor-dims-rec ([tensor tensor] [dim-list (list)])
-      (if (number? (vector-ref tensor 0))
+      (if (not (vector? (vector-ref tensor 0)))
           (reverse (cons (vector-length tensor) dim-list))
           (tensor-dims-rec (vector-ref tensor 0) (cons (vector-length tensor) dim-list)))))
 
@@ -117,11 +118,25 @@
                               (matrix-ref m2 j k)))])
         ((>= j (matrix-cols m1)) accum)))
 
-  (define (matrix-map f m)
-    (vector-map
-     (lambda (v)
-       (vector-map f v))
-     m))
+  (define matrix-map
+    (lambda (f A)
+      (if (> (matrix-num-dims A) 2)
+          (vector-map (lambda (X) (matrix-map f X)) A)
+          (vector-map (lambda (x) (vector-map f x)) A))))
+
+  (define matrix-map2
+    (lambda (f A B)
+      (if (> (matrix-num-dims A) 2)
+          (vector-map (lambda (X Y) (matrix-map2 f X Y)) A B)
+          (vector-map (lambda (x y) (vector-map f x y)) A B))))
+
+  (define (%matrix-fold1 f init m)
+    (if (> (matrix-num-dims m) 1)
+        (vector-fold f init (vector-map (lambda (x) (%matrix-fold1 f init x)) m))
+        (vector-fold f init m)))
+
+  (define (matrix-fold f init . ms)
+    (fold-left f init (map (lambda (m) (%matrix-fold1 f init m)) ms)))
 
   ;; throw error if dims of a1 and a2 are bad
   ;; case on a1/a2 being a constant or not
@@ -149,39 +164,24 @@
   (define (dot v w)
     (matrix-ref (mul (T v) w) 0))
 
-  ;; vector->list probably inefficient, don't know how that's
-  ;; implemented its probably O(n)
-  (define (vector-fold-left f)
-    (lambda (v)
-      (fold-left f (vector-ref v 0) (vector->list v))))
-  (define (matrix-fold-left f m)
-
-    (fold-left f (matrix-ref m 0 0)
-               (vector->list (vector-map (vector-fold-left f) m))))
-
-  (define (matrix-fold f m)
-    (let ([ret (matrix-ref m 0 0)])
-      (do-matrix m ret (i j) (set! ret (f ret (matrix-ref m i j))))))
-
-  ;; not good enough at macros to have matrix-map take variable args
-  (define (matrix= A B)
-    (matrix-fold-left
-     (lambda (x y) (and x y))
-     (vector-map
-      (lambda (a b)
-        (vector-map = a b))
-      A B)))
+  (define matrix=
+    (lambda (A B)
+      (matrix-fold
+       (lambda (x y) (and x y))
+       #t
+       (matrix-map2 =  A B))))
 
   ;; Norms
   (define (matrix-max m)
-    (matrix-fold-left max m))
+    (matrix-fold max -inf.0 m))
+
   (define (matrix-min m)
-    (matrix-fold-left min m))
+    (matrix-fold min +inf.0 m))
 
   (define (frobenius-norm m)
-    (matrix-fold-left
+    (matrix-fold
      +
-     (matrix-map (lambda (x) (expt x 2)) m)))
+     0 (matrix-map (lambda (x) (expt x 2)) m)))
 
   (define (euclidean-norm M)
     (cond
