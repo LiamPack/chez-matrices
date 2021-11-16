@@ -4,8 +4,8 @@
 #!r6rs
 
 (library (chez-matrices)
-  (export make-matrix matrix-ref matrix-set! matrix-dims matrix-num-dims
-          matrix-num-vals matrix-rows matrix-cols matrix? matrix-copy
+  (export make-matrix matrix-ref matrix-set! matrix-shape matrix-rank
+          matrix-num-vals matrix-num-rows matrix-num-cols matrix? matrix-copy
           matrix-flatten vec->matrix matrix-ref-row matrix-set-row!
           matrix-set-diagonal! matrix-identity
           matrix-max matrix-min matrix-contract matrix-ref-col matrix-set-col!
@@ -14,14 +14,14 @@
   (import (rnrs (6))
           (only (srfi :133 vectors) vector-fold))
 
-  (define (matrix-dims tensor)
+  (define (matrix-shape tensor)
     (let tensor-dims-rec ([tensor tensor] [dim-list (list)])
       (if (not (vector? (vector-ref tensor 0)))
           (reverse (cons (vector-length tensor) dim-list))
           (tensor-dims-rec (vector-ref tensor 0) (cons (vector-length tensor) dim-list)))))
 
-  (define (matrix-num-dims tensor)
-    (length (matrix-dims tensor)))
+  (define (matrix-rank tensor)
+    (length (matrix-shape tensor)))
 
   (define-syntax do-matrix
     (syntax-rules ()
@@ -60,10 +60,9 @@
       [(_ m i val) (vector-set! m i val)]
       [(_ m i j k ... val) (matrix-set! (vector-ref m i) j k ... val)]))
 
-
-  (define (matrix-num-vals m) (map * (matrix-dims m)))
-  (define (matrix-rows a) (vector-length a))
-  (define (matrix-cols a)
+  (define (matrix-num-vals m) (map * (matrix-shape m)))
+  (define (matrix-num-rows a) (vector-length a))
+  (define (matrix-num-cols a)
     (if (vector? (matrix-ref a 0))
         (vector-length (matrix-ref a 0))
         1))
@@ -74,21 +73,13 @@
            (> (vector-length x) 0)
            (vector? (vector-ref x 0)))))
 
-  ;; assert proper dims
-  (define (matrix-copy a)
-    (let* ([m (make-matrix (matrix-rows a) (matrix-cols a))])
-      (do-matrix m m (i j) (matrix-set! m i j (matrix-ref a i j)))))
-
-  (define (matrix-copy! a b)
-    (do-matrix a (i j) (matrix-set! a i j (matrix-ref b i j))))
-
   (define (vec->matrix v)
     (make-matrix (vector-length v) 1))
 
   (define (matrix-flatten m)
-    (let* ([v (make-vector (* (matrix-cols m) (matrix-rows m)))])
+    (let* ([v (make-vector (* (matrix-num-cols m) (matrix-num-rows m)))])
       (do-matrix m v (i j)
-                 (vector-set! v (+ j (* i (matrix-cols m)))
+                 (vector-set! v (+ j (* i (matrix-num-cols m)))
                               (matrix-ref m i j)))))
 
   (define (matrix-ref-row m i) (matrix-ref m i))
@@ -116,34 +107,42 @@
     (do ([j 0 (+ 1 j)]
          [accum 0 (+ accum (* (matrix-ref m1 i j)
                               (matrix-ref m2 j k)))])
-        ((>= j (matrix-cols m1)) accum)))
+        ((>= j (matrix-num-cols m1)) accum)))
 
   (define matrix-map
     (lambda (f A)
-      (if (> (matrix-num-dims A) 2)
+      (if (> (matrix-rank A) 2)
           (vector-map (lambda (X) (matrix-map f X)) A)
           (vector-map (lambda (x) (vector-map f x)) A))))
 
   (define matrix-map2
     (lambda (f A B)
-      (if (> (matrix-num-dims A) 2)
+      (if (> (matrix-rank A) 2)
           (vector-map (lambda (X Y) (matrix-map2 f X Y)) A B)
           (vector-map (lambda (x y) (vector-map f x y)) A B))))
 
   (define (%matrix-fold1 f init m)
-    (if (> (matrix-num-dims m) 1)
+    (if (> (matrix-rank m) 1)
         (vector-fold f init (vector-map (lambda (x) (%matrix-fold1 f init x)) m))
         (vector-fold f init m)))
 
   (define (matrix-fold f init . ms)
     (fold-left f init (map (lambda (m) (%matrix-fold1 f init m)) ms)))
 
+
+  ;; assert proper dims
+  (define (matrix-copy a)
+    (matrix-map (lambda (x) x) a))
+
+  (define (matrix-copy! a b)
+    (do-matrix a (i j) (matrix-set! a i j (matrix-ref b i j))))
+
   ;; throw error if dims of a1 and a2 are bad
   ;; case on a1/a2 being a constant or not
   (define (mul a1 a2)
     (cond
      [(and (matrix? a1) (matrix? a2))
-      (let* ([m (make-matrix (matrix-rows a1) (matrix-cols a2))])
+      (let* ([m (make-matrix (matrix-num-rows a1) (matrix-num-cols a2))])
         (do-matrix m m (i k) (matrix-set! m i k (matrix-contract a1 a2 i k))))]
      [(and (matrix? a2) (number? a1))
       (matrix-map (lambda (x) (* a1 x)) a2)]
@@ -153,10 +152,10 @@
   (define (tr m)
     (do ([i 0 (+ 1 i)]
          [accum 0 (+ accum (matrix-ref m i i))])
-        ((>= i (min (matrix-cols m) (matrix-rows m))) accum)))
+        ((>= i (min (matrix-num-cols m) (matrix-num-rows m))) accum)))
 
   (define (T a1)
-    (let ([m (make-matrix (matrix-cols a1) (matrix-rows a1))])
+    (let ([m (make-matrix (matrix-num-cols a1) (matrix-num-rows a1))])
       (do-matrix m m (i j)
                  (matrix-set! m j i (matrix-ref a1 i j)))))
 
@@ -198,8 +197,8 @@
     (when (and (matrix? input-A) (matrix? input-B))
       (let* ([A (matrix-copy input-A)]
              [B (matrix-copy input-B)]
-             [nrows (matrix-rows A)]
-             [ncols (matrix-cols A)])
+             [nrows (matrix-num-rows A)]
+             [ncols (matrix-num-cols A)])
         (let ([leading
                (lambda (col-idx)
                  (call/cc (lambda (break)
@@ -250,10 +249,10 @@
                  (swap-rows j lead)))))))))
 
   (define (matrix-inverse input-A)
-    (when (and (= (matrix-cols input-A) (matrix-rows input-A)) (matrix? input-A))
+    (when (and (= (matrix-num-cols input-A) (matrix-num-rows input-A)) (matrix? input-A))
       (let* ([A (matrix-copy input-A)]
-             [nrows (matrix-rows A)]
-             [ncols (matrix-cols A)]
+             [nrows (matrix-num-rows A)]
+             [ncols (matrix-num-cols A)]
              [inv-A (matrix-identity nrows)])
         (let ([leading
                (lambda (col-idx)
