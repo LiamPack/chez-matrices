@@ -58,10 +58,10 @@
       [(_ i j k ...)
        (make-vector i (make-matrix j k ...))]))
 
-  (define-syntax matrix-ref
-    (syntax-rules ()
-      [(_ m i) (vector-ref m i)]
-      [(_ m i j k ...) (vector-ref (matrix-ref m i k ...) j)]))
+  (define (matrix-ref m . ids)
+    (if (= 1 (length ids))
+        (vector-ref m (car ids))
+        (apply matrix-ref (cons (vector-ref m (car ids)) (cdr ids)))))
 
   (define-syntax matrix-set!
     (syntax-rules ()
