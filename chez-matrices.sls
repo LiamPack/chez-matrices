@@ -32,11 +32,19 @@
          (do-matrix (matrix-ref m 0) (j ...) rest ...))]
       [(_ m (i j ...) rest ...)
        (do ([i 0 (+ 1 i)])
-           ((>= i (car (matrix-dims m))))
+           ((>= i (car (matrix-shape m))))
+         (do-matrix (matrix-ref m 0) (j ...) rest ...))]
+      [(_ m ((i Upper) j ...) rest ...)
+       (do ([i 0 (+ 1 i)])
+           ((>= i Upper))
+         (do-matrix (matrix-ref m 0) (j ...) rest ...))]
+      [(_ m ((i Lower Upper) j ...) rest ...)
+       (do ([i Lower (+ 1 i)])
+           ((>= i Upper))
          (do-matrix (matrix-ref m 0) (j ...) rest ...))]
       [(_ m ret (i j ...) rest ...)
        (do ([i 0 (+ 1 i)])
-           ((>= i (car (matrix-dims m))) ret)
+           ((>= i (car (matrix-shape m))) ret)
          (do-matrix (matrix-ref m 0) (j ...) rest ...))]))
 
   (define-syntax make-matrix
