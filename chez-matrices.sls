@@ -6,11 +6,12 @@
 (library (chez-matrices)
   (export make-matrix matrix-ref matrix-set! matrix-shape matrix-rank
           matrix-num-vals matrix-num-rows matrix-num-cols matrix? matrix-copy
-          matrix-flatten vec->matrix matrix-ref-row matrix-set-row!
+          matrix-flatten vec->row-matrix matrix-ref-row matrix-set-row!
           matrix-set-diagonal! matrix-identity
           matrix-max matrix-min matrix-contract matrix-ref-col matrix-set-col!
-          matrix-map matrix-map2 mul T matrix-fold tr euclidean-norm cross-product
-          theta phi linsolve matrix-inverse matrix= make-matrix do-matrix matrix-fold)
+          matrix-map mul T matrix-fold tr euclidean-norm cross-product
+          theta phi linsolve matrix-inverse matrix= do-matrix matrix-fold
+          matrix-generate)
   (import (rnrs (6))
           (only (srfi :133 vectors) vector-fold))
 
@@ -81,8 +82,11 @@
            (> (vector-length x) 0)
            (vector? (vector-ref x 0)))))
 
-  (define (vec->matrix v)
-    (make-matrix (vector-length v) 1))
+  ;; row matrix
+  (define (vec->row-matrix v)
+    (let ([w (make-vector 1)])
+      (vector-set! w 0 v)
+      w))
 
   (define (matrix-flatten m)
     (let* ([v (make-vector (* (matrix-num-cols m) (matrix-num-rows m)))])
@@ -118,17 +122,11 @@
         ((>= j (matrix-num-cols m1)) accum)))
 
   (define matrix-map
-    (lambda (f A)
-      (if (> (matrix-rank A) 2)
-          (vector-map (lambda (X) (matrix-map f X)) A)
-          (vector-map (lambda (x) (vector-map f x)) A))))
-
-  (define matrix-map2
-    (lambda (f A B)
-      (if (> (matrix-rank A) 2)
-          (vector-map (lambda (X Y) (matrix-map2 f X Y)) A B)
-          (vector-map (lambda (x y) (vector-map f x y)) A B))))
-
+    (lambda (f . As)
+      (if (> (matrix-rank (car As)) 2)
+          (apply vector-map (cons (lambda r (apply matrix-map (cons f r))) As))
+          (apply vector-map (cons (lambda r (apply vector-map (cons f r))) As)))))
+  
   (define (%matrix-fold1 f init m)
     (if (> (matrix-rank m) 1)
         (vector-fold f init (vector-map (lambda (x) (%matrix-fold1 f init x)) m))
@@ -137,6 +135,13 @@
   (define (matrix-fold f init . ms)
     (fold-left f init (map (lambda (m) (%matrix-fold1 f init m)) ms)))
 
+  (define-syntax matrix-generate
+    (syntax-rules ()
+      [(_  (lambda (i j ...) rest ...) n m ...)
+       (let ([a (make-matrix n m ...)])
+         (do-matrix a (i j ...)
+                    (matrix-set! a i j ... ((lambda (i j ...) rest ...) i j ...)))
+         a)]))
 
   ;; assert proper dims
   (define (matrix-copy a)
@@ -176,7 +181,7 @@
       (matrix-fold
        (lambda (x y) (and x y))
        #t
-       (matrix-map2 =  A B))))
+       (matrix-map = A B))))
 
   ;; Norms
   (define (matrix-max m)
