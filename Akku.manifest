@@ -1,7 +1,7 @@
 #!r6rs ; -*- mode: scheme; coding: utf-8 -*-
 (import (akku format manifest))
 
-(akku-package ("chez-matrices" "0.1.0-alpha.0")
+(akku-package ("chez-matrices" "0.2.0-alpha.0")
   (synopsis "Implementation of common matrix (tensor) constructions and operatoins.")
   (authors "Liam Packer")
   (license "MIT")
