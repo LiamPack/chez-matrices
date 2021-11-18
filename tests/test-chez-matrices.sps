@@ -49,6 +49,10 @@
        #(0 0 3 5 0)
        #(0 0 10 5 0)) m)
 
+  (test-equal "matrix-slice"
+    (matrix-slice m '(2 0) '(2 0))
+    '#(#(4 4) #(0 3)))
+
   (test-equal "tr"
     (tr m) (+ 4 3 3 5))
 
@@ -57,11 +61,11 @@
 
   (test-equal "matrix fold left"
     (matrix-fold (lambda (x y) (+ y x)) 0 '#(#(#(4 3 4) #(1 1 1)))) (+ 4 3 4 1 1 1))
-
   ;; (test-equal "det"
   ;;   (det) (* 4 3 3 5))
 
   )
 (test-end "simple matrix operations")
 
-(exit (if (zero? (test-runner-fail-count (test-runner-get))) 0 1))
+;; (exit (if (zero? (test-runner-fail-count (test-runner-get))) 0 1))
+

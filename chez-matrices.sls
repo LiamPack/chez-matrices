@@ -109,16 +109,16 @@
             ((>= i (car upperLower)))
           (matrix-set! ret (- i (cadr upperLower))
                        (matrix-ref m i))
-          (apply matrix-slicer (cons (matrix-ref m i) (cons (matrix-ref ret (- i (cadr upperLower))) (cdr ids))))))))
+          (apply %matrix-slicer (cons (matrix-ref m i) (cons (matrix-ref ret (- i (cadr upperLower))) (cdr ids))))))))
 
   (define (matrix-slice-view m . lst)
     (let ([ret (apply make-matrix (map (lambda (x) (- (car x) (cadr x))) lst))])
-      (apply matrix-slicer (cons m (cons ret lst)))
+      (apply %matrix-slicer (cons m (cons ret lst)))
       ret))
 
   (define (matrix-slice m . lst)
     (let ([ret (apply make-matrix (map (lambda (x) (- (car x) (cadr x))) lst))])
-      (apply matrix-slicer (cons (matrix-copy m) (cons ret lst)))
+      (apply %matrix-slicer (cons (matrix-copy m) (cons ret lst)))
       ret))
 
   (define (matrix-ref-row m i) (matrix-ref m i))
@@ -169,18 +169,6 @@
          (do-matrix a (i j ...)
                     (matrix-set! a i j ... ((lambda (i j ...) rest ...) i j ...)))
          a)]))
-
-  (define-syntax matrix-slice
-    (syntax-rules ()
-      [(_ m ((Lower Upper) ...))
-       (make-matrix (- Upper Lower) ...)
-       ;; (let ([ret (make-matrix (- Upper Lower) ...)])
-       ;;   (do ([i Lower (+ 1 i)] ...)
-       ;;       ((>= i Upper) ...)
-       ;;     (matrix-set! ret (- i Lower) (matrix-ref m i))))
-       ]
-      )
-    )
 
   ;; assert proper dims
   (define (matrix-copy a)
