@@ -61,8 +61,8 @@ operations are implemented (although probably not very efficiently).
 
 Complete implementations:
 - Common matrix operations (`make-matrix, matrix-ref, matrix-set!, matrix-rows,
-matrix-cols, matrix-copy, matrix?, matrix-ref-row ...`)
-- Common matrix operations (`matrix-min, matrix-max, mul, T
+matrix-cols, matrix-copy, matrix?, matrix-ref-row, matrix-slice ...`)
+- Common matrix functions (`matrix-min, matrix-max, mul, T
 (transpose), tr (trace), euclidean-norm ...`)
 - Functions/macros to iterate over a matrix (`do-matrix, matrix-fold, matrix-map,
 matrix-contract (only 1D contractions)`).
