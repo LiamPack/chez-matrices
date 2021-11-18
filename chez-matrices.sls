@@ -107,9 +107,14 @@
       (let ([upperLower (car ids)])
         (do ([i (cadr upperLower) (+ 1 i)])
             ((>= i (car upperLower)))
-          (matrix-set! ret (- i (cadr upperLower))
-                       (matrix-ref m i))
-          (apply %matrix-slicer (cons (matrix-ref m i) (cons (matrix-ref ret (- i (cadr upperLower))) (cdr ids))))))))
+          (if (= 1 (length ids))
+              (matrix-set! ret (- i (cadr upperLower))
+                           (matrix-ref m i))
+              (apply %matrix-slicer
+                     ;; idk a better way to make (list m ret ids)
+                     (cons (matrix-ref m i)
+                           (cons (matrix-ref ret (- i (cadr upperLower)))
+                                 (cdr ids)))))))))
 
   (define (matrix-slice-view m . lst)
     (let ([ret (apply make-matrix (map (lambda (x) (- (car x) (cadr x))) lst))])
