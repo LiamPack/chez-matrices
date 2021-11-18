@@ -11,7 +11,7 @@
           matrix-max matrix-min matrix-contract matrix-ref-col matrix-set-col!
           matrix-map mul T matrix-fold tr euclidean-norm cross-product
           theta phi linsolve matrix-inverse matrix= do-matrix matrix-fold
-          matrix-generate)
+          matrix-generate matrix-slice matrix-slice-view)
   (import (rnrs (6))
           (only (srfi :133 vectors) vector-fold))
 
@@ -48,26 +48,34 @@
            ((>= i (car (matrix-shape m))) ret)
          (do-matrix (matrix-ref m 0) (j ...) rest ...))]))
 
-  (define-syntax make-matrix
-    (syntax-rules ()
-      [(_ i) (make-vector i)]
-      [(_ i j)
-       (do ([m (make-vector i)]
-            [k 0 (+ k 1)])
-           ((= k i) m)
-         (vector-set! m k (make-vector j)))]
-      [(_ i j k ...)
-       (make-vector i (make-matrix j k ...))]))
+  ;; TODO: not tail-recursive :(
+  (define make-matrix
+    (lambda ids
+      (cond
+       [(= 1 (length ids)) (make-vector (car ids))]
+       [(= 2 (length ids))
+        (do ([m (make-vector (car ids))]
+             [k 0 (+ k 1)])
+            ((= k (car ids)) m)
+          (vector-set! m k (make-vector (cadr ids))))]
+       [(> 2 (length ids))
+        (make-vector (car ids) (apply make-matrix (cdr ids)))])))
 
   (define (matrix-ref m . ids)
     (if (= 1 (length ids))
         (vector-ref m (car ids))
         (apply matrix-ref (cons (vector-ref m (car ids)) (cdr ids)))))
 
+  (define (%matrix-set! m val . ids)
+    (if (= 1 (length ids))
+        (vector-set! m (car ids) val)
+        (apply %matrix-set!
+               (cons (vector-ref m (car ids))
+                     (cons val (cdr ids))))))
+
   (define-syntax matrix-set!
     (syntax-rules ()
-      [(_ m i val) (vector-set! m i val)]
-      [(_ m i j k ... val) (matrix-set! (vector-ref m i) j k ... val)]))
+      [(_ m i j ... val) (%matrix-set! m val i j ...)]))
 
   (define (matrix-num-vals m) (map * (matrix-shape m)))
   (define (matrix-num-rows a) (vector-length a))
@@ -93,6 +101,25 @@
       (do-matrix m v (i j)
                  (vector-set! v (+ j (* i (matrix-num-cols m)))
                               (matrix-ref m i j)))))
+
+  (define (%matrix-slicer m ret . ids)
+    (when (not (null? ids))
+      (let ([upperLower (car ids)])
+        (do ([i (cadr upperLower) (+ 1 i)])
+            ((>= i (car upperLower)))
+          (matrix-set! ret (- i (cadr upperLower))
+                       (matrix-ref m i))
+          (apply matrix-slicer (cons (matrix-ref m i) (cons (matrix-ref ret (- i (cadr upperLower))) (cdr ids))))))))
+
+  (define (matrix-slice-view m . lst)
+    (let ([ret (apply make-matrix (map (lambda (x) (- (car x) (cadr x))) lst))])
+      (apply matrix-slicer (cons m (cons ret lst)))
+      ret))
+
+  (define (matrix-slice m . lst)
+    (let ([ret (apply make-matrix (map (lambda (x) (- (car x) (cadr x))) lst))])
+      (apply matrix-slicer (cons (matrix-copy m) (cons ret lst)))
+      ret))
 
   (define (matrix-ref-row m i) (matrix-ref m i))
   (define (matrix-set-row! m i v) (matrix-set! m i v))
@@ -126,7 +153,7 @@
       (if (> (matrix-rank (car As)) 2)
           (apply vector-map (cons (lambda r (apply matrix-map (cons f r))) As))
           (apply vector-map (cons (lambda r (apply vector-map (cons f r))) As)))))
-  
+
   (define (%matrix-fold1 f init m)
     (if (> (matrix-rank m) 1)
         (vector-fold f init (vector-map (lambda (x) (%matrix-fold1 f init x)) m))
@@ -142,6 +169,18 @@
          (do-matrix a (i j ...)
                     (matrix-set! a i j ... ((lambda (i j ...) rest ...) i j ...)))
          a)]))
+
+  (define-syntax matrix-slice
+    (syntax-rules ()
+      [(_ m ((Lower Upper) ...))
+       (make-matrix (- Upper Lower) ...)
+       ;; (let ([ret (make-matrix (- Upper Lower) ...)])
+       ;;   (do ([i Lower (+ 1 i)] ...)
+       ;;       ((>= i Upper) ...)
+       ;;     (matrix-set! ret (- i Lower) (matrix-ref m i))))
+       ]
+      )
+    )
 
   ;; assert proper dims
   (define (matrix-copy a)
